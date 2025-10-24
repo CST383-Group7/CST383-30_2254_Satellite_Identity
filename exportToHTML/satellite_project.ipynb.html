@@ -1,0 +1,441 @@
+<html>
+<head>
+<title>satellite_project.ipynb</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #bcbec4;}
+.s1 { color: #7a7e85;}
+.s2 { color: #cf8e6d;}
+.s3 { color: #bcbec4;}
+.s4 { color: #6aab73;}
+.s5 { color: #2aacb8;}
+.ls0 { height: 1px; border-width: 0; color: #43454a; background-color:#43454a}
+</style>
+</head>
+<body bgcolor="#1e1f22">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+satellite_project.ipynb</font>
+</center></td></tr></table>
+<pre><span class="s0">#%% 
+</span><span class="s1"># Project Progress Report — UCS Satellite Database</span>
+<span class="s1"># Goal: Predict satellite Purpose from orbital and mass features.</span>
+
+<span class="s1"># Target:`Purpose`  </span>
+<span class="s1"># Predictors: `OrbitClass`, `GEOLongitude`, `Perigee`, `Apogee`, `Eccentricity`, `Inclination`, `Period`, `LaunchMass`</span>
+
+<span class="s1">#Authors: Jess Hammond, Gary Kuepper, Keshab Neupane</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s2">import </span><span class="s0">pandas </span><span class="s2">as </span><span class="s0">pd</span>
+<span class="s2">import </span><span class="s0">numpy </span><span class="s2">as </span><span class="s0">np</span>
+<span class="s2">import </span><span class="s0">matplotlib</span><span class="s3">.</span><span class="s0">pyplot </span><span class="s2">as </span><span class="s0">plt</span>
+<span class="s2">import </span><span class="s0">seaborn </span><span class="s2">as </span><span class="s0">sns</span>
+<span class="s2">from </span><span class="s0">matplotlib</span><span class="s3">.</span><span class="s0">pyplot </span><span class="s2">import </span><span class="s0">title</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">model_selection </span><span class="s2">import </span><span class="s0">train_test_split</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">impute </span><span class="s2">import </span><span class="s0">SimpleImputer</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">preprocessing </span><span class="s2">import </span><span class="s0">OneHotEncoder</span><span class="s3">, </span><span class="s0">StandardScaler</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">compose </span><span class="s2">import </span><span class="s0">ColumnTransformer</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">pipeline </span><span class="s2">import </span><span class="s0">Pipeline</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">linear_model </span><span class="s2">import </span><span class="s0">LogisticRegression</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">ensemble </span><span class="s2">import </span><span class="s0">RandomForestClassifier</span>
+<span class="s2">from </span><span class="s0">sklearn</span><span class="s3">.</span><span class="s0">metrics </span><span class="s2">import </span><span class="s0">accuracy_score</span><span class="s3">, </span><span class="s0">classification_report</span><span class="s3">, </span><span class="s0">confusion_matrix</span><span class="s3">, </span><span class="s0">ConfusionMatrixDisplay</span><hr class="ls0"><span class="s0">#%% md 
+## Read the Data <hr class="ls0">#%% 
+</span>
+<span class="s1"># UCS Satellite Database</span>
+<span class="s1"># url: https://www.ucs.org/resources/satellite-database</span>
+<span class="s0">url </span><span class="s3">= </span><span class="s4">&quot;UCS-Satellite-Database-Officialname_5-1-2023.xlsx&quot;</span>
+<span class="s0">df_ucs </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">read_excel</span><span class="s3">(</span><span class="s0">url</span><span class="s3">, </span><span class="s0">sheet_name</span><span class="s3">=</span><span class="s4">&quot;Sheet1&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">df_ucs</span><span class="s3">.</span><span class="s0">info</span><span class="s3">())</span>
+
+<span class="s1"># Satcat Data</span>
+<span class="s1"># url: https://www.celestrak.org/satcat/satcat-format.php</span>
+
+<span class="s0">file </span><span class="s3">= </span><span class="s4">&quot;satcat.csv&quot;</span>
+<span class="s0">df_satcat </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">read_csv</span><span class="s3">(</span><span class="s0">file</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">df_satcat</span><span class="s3">.</span><span class="s0">info</span><span class="s3">())</span>
+<span class="s0">df </span><span class="s3">= </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">merge</span><span class="s3">(</span><span class="s0">df_ucs</span><span class="s3">, </span><span class="s0">df_satcat</span><span class="s3">, </span><span class="s0">left_on</span><span class="s3">=</span><span class="s4">'NORAD Number'</span><span class="s3">, </span><span class="s0">right_on</span><span class="s3">=</span><span class="s4">'NORAD_CAT_ID'</span><span class="s3">)</span>
+
+<span class="s1"># df.to_csv(&quot;merged_data.csv&quot;, index=False)</span><hr class="ls0"><span class="s0">#%% md 
+## Initial Exploration/Data Cleaning 
+ This cleans the table: we rename long column names to shorter ones, drop the junk &quot;Unnamed:*&quot; columns, merge all the Source* columns into one text field (SourcesAll), and convert LaunchDate to a real date so we can also make LaunchYear. <hr class="ls0">#%% 
+</span><span class="s1"># Clean data</span>
+<span class="s0">rename_map </span><span class="s3">= {</span>
+    <span class="s4">'Current Official Name of Satellite'</span><span class="s3">: </span><span class="s4">'SatelliteName'</span><span class="s3">,</span>
+    <span class="s4">'Country/Org of UN Registry'</span><span class="s3">: </span><span class="s4">'UNRegistry'</span><span class="s3">,</span>
+    <span class="s4">'Country of Operator/Owner'</span><span class="s3">: </span><span class="s4">'Country'</span><span class="s3">,</span>
+    <span class="s4">'Operator/Owner'</span><span class="s3">: </span><span class="s4">'Operator'</span><span class="s3">,</span>
+    <span class="s4">'Users'</span><span class="s3">: </span><span class="s4">'Users'</span><span class="s3">,</span>
+    <span class="s4">'Purpose'</span><span class="s3">: </span><span class="s4">'Purpose'</span><span class="s3">,</span>
+    <span class="s4">'Detailed Purpose'</span><span class="s3">: </span><span class="s4">'DetailedPurpose'</span><span class="s3">,</span>
+    <span class="s4">'Class of Orbit'</span><span class="s3">: </span><span class="s4">'OrbitClass'</span><span class="s3">,</span>
+    <span class="s4">'Type of Orbit'</span><span class="s3">: </span><span class="s4">'OrbitType'</span><span class="s3">,</span>
+    <span class="s4">'Longitude of GEO (degrees)'</span><span class="s3">: </span><span class="s4">'GEOLongitude'</span><span class="s3">,</span>
+    <span class="s4">'Perigee (km)'</span><span class="s3">: </span><span class="s4">'Perigee'</span><span class="s3">,</span>
+    <span class="s4">'Apogee (km)'</span><span class="s3">: </span><span class="s4">'Apogee'</span><span class="s3">,</span>
+    <span class="s4">'Eccentricity'</span><span class="s3">: </span><span class="s4">'Eccentricity'</span><span class="s3">,</span>
+    <span class="s4">'Inclination (degrees)'</span><span class="s3">: </span><span class="s4">'Inclination'</span><span class="s3">,</span>
+    <span class="s4">'Period (minutes)'</span><span class="s3">: </span><span class="s4">'Period'</span><span class="s3">,</span>
+    <span class="s4">'Launch Mass (kg.)'</span><span class="s3">: </span><span class="s4">'LaunchMass'</span><span class="s3">,</span>
+    <span class="s4">'Dry Mass (kg.)'</span><span class="s3">: </span><span class="s4">'DryMass'</span><span class="s3">,</span>
+    <span class="s4">'Power (watts)'</span><span class="s3">: </span><span class="s4">'Power'</span><span class="s3">,</span>
+    <span class="s4">'Date of Launch'</span><span class="s3">: </span><span class="s4">'LaunchDate'</span><span class="s3">,</span>
+    <span class="s4">'Expected Lifetime (yrs.)'</span><span class="s3">: </span><span class="s4">'LifetimeYrs'</span><span class="s3">,</span>
+    <span class="s4">'Contractor'</span><span class="s3">: </span><span class="s4">'Contractor'</span><span class="s3">,</span>
+    <span class="s4">'Country of Contractor'</span><span class="s3">: </span><span class="s4">'ContractorCountry'</span><span class="s3">,</span>
+    <span class="s4">'Launch Site'</span><span class="s3">: </span><span class="s4">'LaunchSite'</span><span class="s3">,</span>
+    <span class="s4">'Launch Vehicle'</span><span class="s3">: </span><span class="s4">'LaunchVehicle'</span><span class="s3">,</span>
+    <span class="s4">'COSPAR Number'</span><span class="s3">: </span><span class="s4">'COSPAR'</span><span class="s3">,</span>
+    <span class="s4">'NORAD Number'</span><span class="s3">: </span><span class="s4">'NORAD'</span><span class="s3">,</span>
+    <span class="s4">'Comments'</span><span class="s3">: </span><span class="s4">'Comments'</span><span class="s3">,</span>
+    <span class="s1"># Satcat.csv columns</span>
+    <span class="s4">'OBJECT_NAME'</span><span class="s3">: </span><span class="s4">'SatelliteName'</span><span class="s3">,</span>
+    <span class="s4">'OBJECT_ID'</span><span class="s3">: </span><span class="s4">'ObjectID'</span><span class="s3">,</span>
+    <span class="s4">'NORAD_CAT_ID'</span><span class="s3">: </span><span class="s4">'NORAD'</span><span class="s3">,</span>
+    <span class="s4">'OBJECT_TYPE'</span><span class="s3">: </span><span class="s4">'ObjectType'</span><span class="s3">,</span>
+    <span class="s4">'OPS_STATUS_CODE'</span><span class="s3">: </span><span class="s4">'OPSStatusCode'</span><span class="s3">,</span>
+    <span class="s4">'OWNER'</span><span class="s3">: </span><span class="s4">'Owner'</span><span class="s3">,</span>
+    <span class="s4">'LAUNCH_DATE'</span><span class="s3">: </span><span class="s4">'LaunchDate_sc'</span><span class="s3">,</span>
+    <span class="s4">'LAUNCH_SITE'</span><span class="s3">: </span><span class="s4">'LaunchSite_sc'</span><span class="s3">,</span>
+    <span class="s4">'DECAY_DATE'</span><span class="s3">: </span><span class="s4">'DecayDate'</span><span class="s3">,</span>
+    <span class="s4">'PERIOD'</span><span class="s3">: </span><span class="s4">'Period_sc'</span><span class="s3">,</span>
+    <span class="s4">'INCLINATION'</span><span class="s3">: </span><span class="s4">'Inclination_sc'</span><span class="s3">,</span>
+    <span class="s4">'APOGEE'</span><span class="s3">: </span><span class="s4">'Apogee_sc'</span><span class="s3">,</span>
+    <span class="s4">'PERIGEE'</span><span class="s3">: </span><span class="s4">'Perigee_sc'</span><span class="s3">,</span>
+    <span class="s4">'RCS'</span><span class="s3">: </span><span class="s4">'RCS'</span><span class="s3">,</span>
+    <span class="s4">'DATA_STATUS_CODE'</span><span class="s3">: </span><span class="s4">'DataStatusCode'</span><span class="s3">,</span>
+    <span class="s4">'ORBIT_CENTER'</span><span class="s3">: </span><span class="s4">'OrbitCenter'</span><span class="s3">,</span>
+    <span class="s4">'ORBIT_TYPE'</span><span class="s3">: </span><span class="s4">'OrbitType'</span>
+<span class="s3">}</span>
+<span class="s0">df </span><span class="s3">= </span><span class="s0">df</span><span class="s3">.</span><span class="s0">rename</span><span class="s3">(</span><span class="s0">columns</span><span class="s3">={</span><span class="s0">k</span><span class="s3">: </span><span class="s0">v </span><span class="s2">for </span><span class="s0">k</span><span class="s3">, </span><span class="s0">v </span><span class="s2">in </span><span class="s0">rename_map</span><span class="s3">.</span><span class="s0">items</span><span class="s3">() </span><span class="s2">if </span><span class="s0">k </span><span class="s2">in </span><span class="s0">df</span><span class="s3">.</span><span class="s0">columns</span><span class="s3">})</span>
+<span class="s0">df</span><span class="s3">[</span><span class="s4">'OrbitClass'</span><span class="s3">] = </span><span class="s0">df</span><span class="s3">[</span><span class="s4">'OrbitClass'</span><span class="s3">].</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">).</span><span class="s0">str</span><span class="s3">.</span><span class="s0">upper</span><span class="s3">()</span>
+<span class="s1"># drop all Unnamed: columns</span>
+<span class="s0">unnamed_cols </span><span class="s3">= [</span><span class="s0">c </span><span class="s2">for </span><span class="s0">c </span><span class="s2">in </span><span class="s0">df</span><span class="s3">.</span><span class="s0">columns </span><span class="s2">if </span><span class="s0">c</span><span class="s3">.</span><span class="s0">startswith</span><span class="s3">(</span><span class="s4">&quot;Unnamed:&quot;</span><span class="s3">)]</span>
+<span class="s0">df </span><span class="s3">= </span><span class="s0">df</span><span class="s3">.</span><span class="s0">drop</span><span class="s3">(</span><span class="s0">columns</span><span class="s3">=</span><span class="s0">unnamed_cols</span><span class="s3">)</span>
+
+<span class="s1"># combine Source columns into one text field</span>
+<span class="s0">source_cols </span><span class="s3">= [</span><span class="s0">c </span><span class="s2">for </span><span class="s0">c </span><span class="s2">in </span><span class="s0">df</span><span class="s3">.</span><span class="s0">columns </span><span class="s2">if </span><span class="s0">c</span><span class="s3">.</span><span class="s0">startswith</span><span class="s3">(</span><span class="s4">&quot;Source&quot;</span><span class="s3">)]</span>
+<span class="s2">if </span><span class="s0">len</span><span class="s3">(</span><span class="s0">source_cols</span><span class="s3">) &gt; </span><span class="s5">0</span><span class="s3">:</span>
+    <span class="s0">df</span><span class="s3">[</span><span class="s4">'SourcesAll'</span><span class="s3">] = </span><span class="s0">df</span><span class="s3">[</span><span class="s0">source_cols</span><span class="s3">] </span><span class="s0">\</span>
+        <span class="s3">.</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">) </span><span class="s0">\</span>
+        <span class="s3">.</span><span class="s0">replace</span><span class="s3">({</span><span class="s4">'nan'</span><span class="s3">: </span><span class="s0">np</span><span class="s3">.</span><span class="s0">nan</span><span class="s3">}) </span><span class="s0">\</span>
+        <span class="s3">.</span><span class="s0">apply</span><span class="s3">(</span><span class="s2">lambda </span><span class="s0">row</span><span class="s3">: </span><span class="s4">&quot;; &quot;</span><span class="s3">.</span><span class="s0">join</span><span class="s3">([</span><span class="s0">v </span><span class="s2">for </span><span class="s0">v </span><span class="s2">in </span><span class="s0">row </span><span class="s2">if </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">notna</span><span class="s3">(</span><span class="s0">v</span><span class="s3">)]), </span><span class="s0">axis</span><span class="s3">=</span><span class="s5">1</span><span class="s3">)</span>
+    <span class="s0">df </span><span class="s3">= </span><span class="s0">df</span><span class="s3">.</span><span class="s0">drop</span><span class="s3">(</span><span class="s0">columns</span><span class="s3">=</span><span class="s0">source_cols</span><span class="s3">)</span>
+
+<span class="s2">if </span><span class="s4">'LaunchDate' </span><span class="s2">in </span><span class="s0">df</span><span class="s3">.</span><span class="s0">columns</span><span class="s3">:</span>
+    <span class="s0">df</span><span class="s3">[</span><span class="s4">'LaunchDate'</span><span class="s3">] = </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">to_datetime</span><span class="s3">(</span><span class="s0">df</span><span class="s3">[</span><span class="s4">'LaunchDate'</span><span class="s3">], </span><span class="s0">errors</span><span class="s3">=</span><span class="s4">'coerce'</span><span class="s3">)</span>
+    <span class="s0">df</span><span class="s3">[</span><span class="s4">'LaunchYear'</span><span class="s3">] = </span><span class="s0">df</span><span class="s3">[</span><span class="s4">'LaunchDate'</span><span class="s3">].</span><span class="s0">dt</span><span class="s3">.</span><span class="s0">year</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s0">df</span><span class="s3">.</span><span class="s0">info</span><span class="s3">())</span>
+<hr class="ls0"><span class="s0">#%% md 
+#### Cleaning User column <hr class="ls0">#%% 
+</span>
+<span class="s1"># Clean up users data as there are many duplicates</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">f&quot;Old Users&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">df</span><span class="s3">[</span><span class="s4">'Users'</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">(</span><span class="s0">dropna</span><span class="s3">=</span><span class="s2">False</span><span class="s3">))</span>
+<span class="s0">syn_map </span><span class="s3">= {</span>
+    <span class="s4">'Govt'</span><span class="s3">: </span><span class="s4">'Government'</span><span class="s3">,</span>
+    <span class="s4">'Gov'</span><span class="s3">: </span><span class="s4">'Government'</span><span class="s3">,</span>
+    <span class="s4">'Government'</span><span class="s3">: </span><span class="s4">'Government'</span><span class="s3">,</span>
+    <span class="s4">'Military'</span><span class="s3">: </span><span class="s4">'Military'</span><span class="s3">,</span>
+    <span class="s4">'Commercial'</span><span class="s3">: </span><span class="s4">'Commercial'</span><span class="s3">,</span>
+    <span class="s4">'Civil'</span><span class="s3">: </span><span class="s4">'Civil'</span><span class="s3">,</span>
+<span class="s3">}</span>
+
+<span class="s1"># Define a canonical order so joined categories are consistent</span>
+<span class="s0">order </span><span class="s3">= [</span><span class="s4">'Commercial'</span><span class="s3">, </span><span class="s4">'Government'</span><span class="s3">, </span><span class="s4">'Military'</span><span class="s3">, </span><span class="s4">'Civil'</span><span class="s3">]</span>
+<span class="s0">order_rank </span><span class="s3">= {</span><span class="s0">k</span><span class="s3">: </span><span class="s0">i </span><span class="s2">for </span><span class="s0">i</span><span class="s3">, </span><span class="s0">k </span><span class="s2">in </span><span class="s0">enumerate</span><span class="s3">(</span><span class="s0">order</span><span class="s3">)}</span>
+
+
+<span class="s2">def </span><span class="s0">normalize_users</span><span class="s3">(</span><span class="s0">val</span><span class="s3">):</span>
+    <span class="s2">if </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">isna</span><span class="s3">(</span><span class="s0">val</span><span class="s3">):</span>
+        <span class="s2">return </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">NA</span>
+    <span class="s1"># Split, trim, and standardize case</span>
+    <span class="s0">tokens </span><span class="s3">= [</span><span class="s0">t</span><span class="s3">.</span><span class="s0">strip</span><span class="s3">() </span><span class="s2">for </span><span class="s0">t </span><span class="s2">in </span><span class="s0">str</span><span class="s3">(</span><span class="s0">val</span><span class="s3">).</span><span class="s0">split</span><span class="s3">(</span><span class="s4">'/'</span><span class="s3">)]</span>
+    <span class="s0">tokens </span><span class="s3">= [</span><span class="s0">t </span><span class="s2">for </span><span class="s0">t </span><span class="s2">in </span><span class="s0">tokens </span><span class="s2">if </span><span class="s0">t </span><span class="s3">!= </span><span class="s4">''</span><span class="s3">]  </span><span class="s1"># drop empties</span>
+
+    <span class="s1"># Title-case to normalize, then apply synonyms map</span>
+    <span class="s0">tokens </span><span class="s3">= [</span><span class="s0">syn_map</span><span class="s3">.</span><span class="s0">get</span><span class="s3">(</span><span class="s0">t</span><span class="s3">.</span><span class="s0">title</span><span class="s3">(), </span><span class="s0">t</span><span class="s3">.</span><span class="s0">title</span><span class="s3">()) </span><span class="s2">for </span><span class="s0">t </span><span class="s2">in </span><span class="s0">tokens</span><span class="s3">]</span>
+
+    <span class="s1"># Deduplicate while keeping only known categories (optional: keep unknowns too)</span>
+    <span class="s0">uniq </span><span class="s3">= </span><span class="s0">sorted</span><span class="s3">(</span><span class="s0">set</span><span class="s3">(</span><span class="s0">tokens</span><span class="s3">), </span><span class="s0">key</span><span class="s3">=</span><span class="s2">lambda </span><span class="s0">x</span><span class="s3">: </span><span class="s0">order_rank</span><span class="s3">.</span><span class="s0">get</span><span class="s3">(</span><span class="s0">x</span><span class="s3">, </span><span class="s5">999</span><span class="s3">))</span>
+
+    <span class="s2">if </span><span class="s0">len</span><span class="s3">(</span><span class="s0">uniq</span><span class="s3">) == </span><span class="s5">0</span><span class="s3">:</span>
+        <span class="s2">return </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">NA</span>
+    <span class="s2">if </span><span class="s0">len</span><span class="s3">(</span><span class="s0">uniq</span><span class="s3">) == </span><span class="s5">1</span><span class="s3">:</span>
+        <span class="s2">return </span><span class="s0">uniq</span><span class="s3">[</span><span class="s5">0</span><span class="s3">]</span>
+    <span class="s2">return </span><span class="s4">'/'</span><span class="s3">.</span><span class="s0">join</span><span class="s3">(</span><span class="s0">uniq</span><span class="s3">)</span>
+
+
+<span class="s1"># Apply normalization (create a new column or overwrite existing)</span>
+<span class="s0">df</span><span class="s3">[</span><span class="s4">'Users'</span><span class="s3">] = </span><span class="s0">df</span><span class="s3">[</span><span class="s4">'Users'</span><span class="s3">].</span><span class="s0">apply</span><span class="s3">(</span><span class="s0">normalize_users</span><span class="s3">)</span>
+
+<span class="s1"># If you want to overwrite the original column:</span>
+<span class="s1"># df['Users'] = df['Users'].apply(normalize_users)</span>
+
+<span class="s1"># Inspect results</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">&quot;</span><span class="s2">\n </span><span class="s4">New Clean Users&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">df</span><span class="s3">[</span><span class="s4">'Users'</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">(</span><span class="s0">dropna</span><span class="s3">=</span><span class="s2">False</span><span class="s3">))</span><hr class="ls0"><span class="s0">#%% md 
+#### Change OpstatusCode to verbose string <hr class="ls0">#%% 
+</span><span class="s1"># Example mapping (adjust if your codes or wording differ)</span>
+<span class="s0">status_map </span><span class="s3">= {</span>
+    <span class="s4">'+'</span><span class="s3">: </span><span class="s4">'Op'</span><span class="s3">,</span>
+    <span class="s4">'-'</span><span class="s3">: </span><span class="s4">'Nonop'</span><span class="s3">,</span>
+    <span class="s4">'P'</span><span class="s3">: </span><span class="s4">'POp'</span><span class="s3">,</span>
+    <span class="s4">'B'</span><span class="s3">: </span><span class="s4">'Bkp/Stb'</span><span class="s3">,</span>
+    <span class="s4">'S'</span><span class="s3">: </span><span class="s4">'Spare'</span><span class="s3">,</span>
+    <span class="s4">'X'</span><span class="s3">: </span><span class="s4">'ExtMis'</span><span class="s3">,</span>
+    <span class="s4">'D'</span><span class="s3">: </span><span class="s4">'Decayed'</span><span class="s3">,</span>
+    <span class="s4">'?'</span><span class="s3">: </span><span class="s4">'Unknown'</span>
+    <span class="s1"># Add any other codes you have if needed</span>
+<span class="s3">}</span>
+<span class="s0">df</span><span class="s3">[</span><span class="s4">'Status'</span><span class="s3">] = </span><span class="s0">df</span><span class="s3">[</span><span class="s4">'OPSStatusCode'</span><span class="s3">].</span><span class="s0">map</span><span class="s3">(</span><span class="s0">status_map</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+#### Clean up of Purpose Column 
+ 
+This part cleans the Purpose text (drops blanks, trims spaces, fixes casing), then groups many messy purpose labels into a few simple buckets: Communications, Navigation, Technology (incl. educational/platform), Science (Earth), Science (Space), and Science (Earth+Space). We apply the mapper to create PurposeSuperAudit, print the new bucket counts, and list anything that still fell into Other so we can fix it. <hr class="ls0">#%% 
+target_col </span><span class="s3">= </span><span class="s4">'Purpose'</span>
+
+<span class="s0">num_cols </span><span class="s3">= [</span><span class="s0">c </span><span class="s2">for </span><span class="s0">c </span><span class="s2">in </span><span class="s3">[</span><span class="s4">'Perigee'</span><span class="s3">, </span><span class="s4">'Apogee'</span><span class="s3">, </span><span class="s4">'Eccentricity'</span><span class="s3">, </span><span class="s4">'Inclination'</span><span class="s3">, </span><span class="s4">'LaunchYear'</span><span class="s3">, </span><span class="s4">'GEOLongitude'</span><span class="s3">] </span><span class="s2">if </span><span class="s0">c </span><span class="s2">in </span><span class="s0">df</span><span class="s3">.</span><span class="s0">columns</span><span class="s3">]</span>
+<span class="s0">cat_cols </span><span class="s3">= [</span><span class="s0">c </span><span class="s2">for </span><span class="s0">c </span><span class="s2">in </span><span class="s3">[</span><span class="s4">'OrbitClass'</span><span class="s3">, </span><span class="s4">'Users'</span><span class="s3">,  </span><span class="s4">'Operator'</span><span class="s3">, </span><span class="s4">'Owner'</span><span class="s3">, </span><span class="s4">'Status'</span><span class="s3">] </span><span class="s2">if</span>
+            <span class="s0">c </span><span class="s2">in </span><span class="s0">df</span><span class="s3">.</span><span class="s0">columns</span><span class="s3">]</span>
+
+<span class="s1"># Drop rows missing Purpose</span>
+<span class="s0">dfm </span><span class="s3">= </span><span class="s0">df</span><span class="s3">.</span><span class="s0">dropna</span><span class="s3">(</span><span class="s0">subset</span><span class="s3">=[</span><span class="s0">target_col</span><span class="s3">]).</span><span class="s0">copy</span><span class="s3">()</span>
+<span class="s1"># Remove leading/trailing spaces and double spaces</span>
+<span class="s0">dfm</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">] = (</span>
+    <span class="s0">dfm</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">]</span>
+    <span class="s3">.</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">str</span><span class="s3">.</span><span class="s0">strip</span><span class="s3">()</span>
+    <span class="s3">.</span><span class="s0">str</span><span class="s3">.</span><span class="s0">replace</span><span class="s3">(</span><span class="s4">r&quot;\s+&quot;</span><span class="s3">, </span><span class="s4">&quot; &quot;</span><span class="s3">, </span><span class="s0">regex</span><span class="s3">=</span><span class="s2">True</span><span class="s3">)</span>
+<span class="s3">)</span>
+
+<span class="s1"># Standardize capitalization</span>
+<span class="s0">dfm</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">] = </span><span class="s0">dfm</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">str</span><span class="s3">.</span><span class="s0">title</span><span class="s3">()</span>
+
+<span class="s1"># Old buckets</span>
+<span class="s0">num_of_old_buckets </span><span class="s3">= </span><span class="s0">dfm</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">()</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">f&quot;</span><span class="s2">\n</span><span class="s4">Old Buckets: </span><span class="s2">{</span><span class="s0">len</span><span class="s3">(</span><span class="s0">num_of_old_buckets</span><span class="s3">)</span><span class="s2">}</span><span class="s4">&quot;</span><span class="s3">)</span>
+
+
+<span class="s1"># print(dfm['DetailedPurpose'].value_counts().head(50))</span>
+
+
+<span class="s1"># Combine purposes and remove redundant labels (Eg. Space Science &amp; Space Observation)</span>
+<span class="s2">def </span><span class="s0">map_purpose</span><span class="s3">(</span><span class="s0">p</span><span class="s3">):</span>
+    <span class="s0">s </span><span class="s3">= </span><span class="s0">str</span><span class="s3">(</span><span class="s0">p</span><span class="s3">).</span><span class="s0">lower</span><span class="s3">().</span><span class="s0">strip</span><span class="s3">()</span>
+    <span class="s0">s </span><span class="s3">= </span><span class="s4">&quot; &quot;</span><span class="s3">.</span><span class="s0">join</span><span class="s3">(</span><span class="s0">s</span><span class="s3">.</span><span class="s0">split</span><span class="s3">())</span>
+
+    <span class="s1"># Buckets</span>
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s3">[</span><span class="s4">&quot;surveillance&quot;</span><span class="s3">]):</span>
+        <span class="s2">return </span><span class="s4">&quot;Surveillance&quot;</span>
+
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s3">[</span><span class="s4">&quot;navigation&quot;</span><span class="s3">, </span><span class="s4">&quot;positioning&quot;</span><span class="s3">]):</span>
+        <span class="s2">return </span><span class="s4">&quot;Navigation&quot;</span>
+
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s3">[</span><span class="s4">&quot;mission extension&quot;</span><span class="s3">, </span><span class="s4">&quot;technology&quot;</span><span class="s3">, </span><span class="s4">&quot;educational&quot;</span><span class="s3">, </span><span class="s4">&quot;education&quot;</span><span class="s3">, </span><span class="s4">&quot;platform&quot;</span><span class="s3">]):</span>
+        <span class="s2">return </span><span class="s4">&quot;Tech Demo&quot;</span>
+
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s3">[</span><span class="s4">&quot;science&quot;</span><span class="s3">, </span><span class="s4">&quot;space&quot;</span><span class="s3">, </span><span class="s4">&quot;earth&quot;</span><span class="s3">, </span><span class="s4">&quot;meteorolog&quot;</span><span class="s3">]):</span>
+        <span class="s2">return </span><span class="s4">&quot;Science&quot;</span>
+
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s3">[</span><span class="s4">&quot;communications&quot;</span><span class="s3">, </span><span class="s4">&quot;communication&quot;</span><span class="s3">]):</span>
+        <span class="s2">return </span><span class="s4">&quot;Communications&quot;</span>
+
+    <span class="s2">return </span><span class="s4">&quot;Other&quot;</span>
+
+
+<span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">] = </span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;Purpose&quot;</span><span class="s3">].</span><span class="s0">apply</span><span class="s3">(</span><span class="s0">map_purpose</span><span class="s3">)</span>
+
+<span class="s1"># New buckets</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">&quot;</span><span class="s2">\n</span><span class="s4">New Buckets&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">())</span>
+
+<hr class="ls0"><span class="s0">#%% md 
+#### Further clean up of Military and Military satellites used for surveillance <hr class="ls0">#%% 
+</span><span class="s1"># Keywords to detect in DetailedPurpose that should override PurposeSuperAudit</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">&quot;</span><span class="s2">\n</span><span class="s4">Old Buckets&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">())</span>
+
+<span class="s0">override_surveil </span><span class="s3">= [</span>
+    <span class="s4">&quot;intelligence&quot;</span><span class="s3">, </span><span class="s4">&quot;surveillance&quot;</span><span class="s3">, </span><span class="s4">&quot;military&quot;</span><span class="s3">, </span><span class="s4">&quot;reconnaissance&quot;</span><span class="s3">,</span>
+    <span class="s4">&quot;comint&quot;</span><span class="s3">, </span><span class="s4">&quot;signals&quot;</span><span class="s3">, </span><span class="s4">&quot;spectrum monitoring&quot;</span><span class="s3">, </span><span class="s4">&quot;military intelligence&quot;</span>
+<span class="s3">]</span>
+
+<span class="s1"># AIS is maritime navigation system</span>
+<span class="s0">override_nav </span><span class="s3">= [</span><span class="s4">&quot;ais&quot;</span><span class="s3">, </span><span class="s4">&quot;automatic identification system&quot;</span><span class="s3">, </span><span class="s4">&quot;identification &quot;</span><span class="s3">]</span>
+
+<span class="s2">def </span><span class="s0">derive_from_detailed</span><span class="s3">(</span><span class="s0">p</span><span class="s3">):</span>
+    <span class="s0">s </span><span class="s3">= </span><span class="s0">str</span><span class="s3">(</span><span class="s0">p</span><span class="s3">).</span><span class="s0">lower</span><span class="s3">().</span><span class="s0">strip</span><span class="s3">()</span>
+    <span class="s0">s </span><span class="s3">= </span><span class="s4">&quot; &quot;</span><span class="s3">.</span><span class="s0">join</span><span class="s3">(</span><span class="s0">s</span><span class="s3">.</span><span class="s0">split</span><span class="s3">())</span>
+
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s0">override_surveil</span><span class="s3">):</span>
+        <span class="s1"># You can choose the target bucket here; using &quot;Surveillance&quot; as example</span>
+        <span class="s2">return </span><span class="s4">&quot;Surveillance&quot;</span>
+
+    <span class="s2">if </span><span class="s0">any</span><span class="s3">(</span><span class="s0">k </span><span class="s2">in </span><span class="s0">s </span><span class="s2">for </span><span class="s0">k </span><span class="s2">in </span><span class="s0">override_nav</span><span class="s3">):</span>
+        <span class="s1"># You can choose the target bucket here; using &quot;Surveillance&quot; as example</span>
+        <span class="s2">return </span><span class="s4">&quot;Navigation&quot;</span>
+
+    <span class="s2">return None</span>
+
+
+<span class="s1"># Compute overrides from DetailedPurpose</span>
+<span class="s0">override_fetched </span><span class="s3">= </span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;DetailedPurpose&quot;</span><span class="s3">].</span><span class="s0">apply</span><span class="s3">(</span><span class="s0">derive_from_detailed</span><span class="s3">)</span>
+
+<span class="s1"># Apply overrides to existing PurposeSuperAudit, keeping original when no override</span>
+<span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">] = </span><span class="s0">override_fetched</span><span class="s3">.</span><span class="s0">where</span><span class="s3">(</span><span class="s0">override_fetched</span><span class="s3">.</span><span class="s0">notna</span><span class="s3">(), </span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">])</span>
+
+<span class="s1"># Ensure there is a default for any remaining unknowns</span>
+<span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">] = </span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">].</span><span class="s0">fillna</span><span class="s3">(</span><span class="s4">&quot;Other&quot;</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s4">&quot;</span><span class="s2">\n</span><span class="s4">New Buckets&quot;</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">())</span><hr class="ls0"><span class="s0">#%% md 
+#### Operational Status of Satellites grouped by Purpose <hr class="ls0">#%% 
+</span><span class="s1"># dfm.to_csv(&quot;merged_clean_data.csv&quot;, index=False)</span>
+<span class="s0">table </span><span class="s3">= </span><span class="s0">dfm</span><span class="s3">.</span><span class="s0">groupby</span><span class="s3">(</span><span class="s4">'PurposeSuperAudit'</span><span class="s3">)[</span><span class="s4">'Status'</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">(</span><span class="s0">dropna</span><span class="s3">=</span><span class="s2">False</span><span class="s3">).</span><span class="s0">unstack</span><span class="s3">(</span><span class="s0">fill_value</span><span class="s3">=</span><span class="s5">0</span><span class="s3">)</span>
+<span class="s0">table</span><span class="s3">[</span><span class="s4">'Total'</span><span class="s3">] = </span><span class="s0">table</span><span class="s3">.</span><span class="s0">sum</span><span class="s3">(</span><span class="s0">axis</span><span class="s3">=</span><span class="s5">1</span><span class="s3">)</span>
+<span class="s0">table </span><span class="s3">= </span><span class="s0">table</span><span class="s3">.</span><span class="s0">sort_values</span><span class="s3">(</span><span class="s0">by</span><span class="s3">=</span><span class="s4">'Total'</span><span class="s3">, </span><span class="s0">ascending</span><span class="s3">=</span><span class="s2">False</span><span class="s3">)</span>
+<span class="s2">with </span><span class="s0">pd</span><span class="s3">.</span><span class="s0">option_context</span><span class="s3">(</span><span class="s4">'display.max_columns'</span><span class="s3">, </span><span class="s2">None</span><span class="s3">):</span>
+    <span class="s0">print</span><span class="s3">(</span><span class="s0">table</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">&quot;</span><span class="s2">\n</span><span class="s4">&quot;</span><span class="s3">, </span><span class="s0">table</span><span class="s3">)</span><hr class="ls0"><span class="s0">#%% md 
+## Exploration and Visualization <hr class="ls0">#%% 
+</span>
+
+<span class="s0">target_col </span><span class="s3">= </span><span class="s4">'PurposeSuperAudit'  </span><span class="s1"># or 'Purpose' if you prefer</span>
+<span class="s0">max_points_per_class </span><span class="s3">= </span><span class="s5">500</span>
+
+<span class="s1"># Drop Unknown and ensure numerics present</span>
+<span class="s0">df_plot </span><span class="s3">= </span><span class="s0">dfm</span><span class="s3">.</span><span class="s0">copy</span><span class="s3">()</span>
+<span class="s0">df_plot </span><span class="s3">= </span><span class="s0">df_plot</span><span class="s3">[~</span><span class="s0">df_plot</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">).</span><span class="s0">str</span><span class="s3">.</span><span class="s0">lower</span><span class="s3">().</span><span class="s0">eq</span><span class="s3">(</span><span class="s4">'unknown'</span><span class="s3">)]</span>
+<span class="s0">df_plot </span><span class="s3">= </span><span class="s0">df_plot</span><span class="s3">[</span><span class="s0">num_cols </span><span class="s3">+ [</span><span class="s0">target_col</span><span class="s3">] + </span><span class="s0">cat_cols</span><span class="s3">].</span><span class="s0">dropna</span><span class="s3">(</span><span class="s0">subset</span><span class="s3">=</span><span class="s0">num_cols</span><span class="s3">)</span>
+
+<span class="s1"># Downsample per class while preserving columns</span>
+<span class="s0">df_plot_bal </span><span class="s3">= (</span>
+    <span class="s0">df_plot</span><span class="s3">.</span><span class="s0">groupby</span><span class="s3">(</span><span class="s0">target_col</span><span class="s3">, </span><span class="s0">group_keys</span><span class="s3">=</span><span class="s2">False</span><span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">sample</span><span class="s3">(</span><span class="s0">frac</span><span class="s3">=</span><span class="s5">1.0</span><span class="s3">, </span><span class="s0">random_state</span><span class="s3">=</span><span class="s5">42</span><span class="s3">)  </span><span class="s1"># shuffle within each class</span>
+    <span class="s3">.</span><span class="s0">groupby</span><span class="s3">(</span><span class="s0">target_col</span><span class="s3">, </span><span class="s0">group_keys</span><span class="s3">=</span><span class="s2">False</span><span class="s3">)</span>
+    <span class="s3">.</span><span class="s0">head</span><span class="s3">(</span><span class="s0">max_points_per_class</span><span class="s3">)  </span><span class="s1"># cap per class</span>
+<span class="s3">)</span>
+
+<span class="s1"># Sanity checks</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">'Hue column present?'</span><span class="s3">, </span><span class="s0">target_col </span><span class="s2">in </span><span class="s0">df_plot_bal</span><span class="s3">.</span><span class="s0">columns</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s4">'Class sizes used in plot:'</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">df_plot_bal</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">())</span>
+
+<span class="s1"># Make the pairplot</span>
+<span class="s1"># sns.set(style='ticks', context='talk')</span>
+<span class="s0">g </span><span class="s3">= </span><span class="s0">sns</span><span class="s3">.</span><span class="s0">pairplot</span><span class="s3">(</span>
+    <span class="s0">df_plot_bal</span><span class="s3">,</span>
+    <span class="s0">vars</span><span class="s3">=</span><span class="s0">num_cols</span><span class="s3">,</span>
+    <span class="s0">hue</span><span class="s3">=</span><span class="s0">target_col </span><span class="s2">if </span><span class="s0">target_col </span><span class="s2">in </span><span class="s0">df_plot_bal</span><span class="s3">.</span><span class="s0">columns </span><span class="s2">else None</span><span class="s3">,</span>
+    <span class="s0">corner</span><span class="s3">=</span><span class="s2">True</span><span class="s3">,</span>
+    <span class="s0">diag_kind</span><span class="s3">=</span><span class="s4">'kde'</span><span class="s3">,</span>
+    <span class="s0">plot_kws</span><span class="s3">={</span><span class="s4">'alpha'</span><span class="s3">: </span><span class="s5">0.6</span><span class="s3">, </span><span class="s4">'s'</span><span class="s3">: </span><span class="s5">15</span><span class="s3">, </span><span class="s4">'edgecolor'</span><span class="s3">: </span><span class="s4">'black'</span><span class="s3">}</span>
+<span class="s3">)</span>
+<span class="s0">g</span><span class="s3">.</span><span class="s0">fig</span><span class="s3">.</span><span class="s0">suptitle</span><span class="s3">(</span><span class="s4">'Pairplot of Selected Features by Purpose'</span><span class="s3">, </span><span class="s0">y</span><span class="s3">=</span><span class="s5">1.02</span><span class="s3">)</span>
+<span class="s0">g</span><span class="s3">.</span><span class="s0">_legend</span><span class="s3">.</span><span class="s0">set_title</span><span class="s3">(</span><span class="s4">&quot;Purpose&quot;</span><span class="s3">)</span>
+
+
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span>
+
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">set</span><span class="s3">(</span><span class="s0">style</span><span class="s3">=</span><span class="s4">'ticks'</span><span class="s3">, </span><span class="s0">context</span><span class="s3">=</span><span class="s4">'talk'</span><span class="s3">)</span>
+<span class="s0">n </span><span class="s3">= </span><span class="s0">len</span><span class="s3">(</span><span class="s0">cat_cols</span><span class="s3">)</span>
+
+<span class="s0">plot_df </span><span class="s3">= </span><span class="s0">dfm</span><span class="s3">.</span><span class="s0">copy</span><span class="s3">()</span>
+<span class="s0">plot_df</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">] = </span><span class="s0">plot_df</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">).</span><span class="s0">str</span><span class="s3">.</span><span class="s0">strip</span><span class="s3">()</span>
+<span class="s0">plot_df </span><span class="s3">= </span><span class="s0">plot_df</span><span class="s3">[~</span><span class="s0">plot_df</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">str</span><span class="s3">.</span><span class="s0">lower</span><span class="s3">().</span><span class="s0">eq</span><span class="s3">(</span><span class="s4">'unknown'</span><span class="s3">)]</span>
+
+<span class="s1"># Optional: order categories by total count</span>
+<span class="s0">order_oc </span><span class="s3">= </span><span class="s0">plot_df</span><span class="s3">[</span><span class="s4">'OrbitClass'</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">().</span><span class="s0">index</span>
+
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">figure</span><span class="s3">(</span><span class="s0">figsize</span><span class="s3">=(</span><span class="s5">12</span><span class="s3">, </span><span class="s5">5</span><span class="s3">))</span>
+<span class="s0">sns</span><span class="s3">.</span><span class="s0">countplot</span><span class="s3">(</span><span class="s0">data</span><span class="s3">=</span><span class="s0">plot_df</span><span class="s3">, </span><span class="s0">x</span><span class="s3">=</span><span class="s4">'OrbitClass'</span><span class="s3">, </span><span class="s0">hue</span><span class="s3">=</span><span class="s0">target_col</span><span class="s3">, </span><span class="s0">order</span><span class="s3">=</span><span class="s0">order_oc</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">title</span><span class="s3">(</span><span class="s4">'Counts by OrbitClass and Purpose'</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">xticks</span><span class="s3">(</span><span class="s0">rotation</span><span class="s3">=</span><span class="s5">45</span><span class="s3">, </span><span class="s0">ha</span><span class="s3">=</span><span class="s4">'right'</span><span class="s3">)</span>
+
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span>
+
+<hr class="ls0"><span class="s0">#%% md 
+## Training a Logistic Regression Model 
+ 
+We take the cleaned Purpose buckets, drop rows labeled “Unknown,” and split the data into train (80%) and test (20%). We fill missing numbers with the train median, turn OrbitClass into one-hot columns, and standardize the numeric features. 
+ 
+Then we train a Logistic Regression model, print the accuracy and the per-class scores, and show a confusion matrix to see which classes the model confuses. <hr class="ls0">#%% 
+target_col </span><span class="s3">= </span><span class="s4">&quot;PurposeSuperAudit&quot;</span>
+
+<span class="s1"># Drop Unknown label</span>
+<span class="s0">dfm_model </span><span class="s3">= </span><span class="s0">dfm</span><span class="s3">[~</span><span class="s0">dfm</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">isin</span><span class="s3">([</span><span class="s4">&quot;Unknown&quot;</span><span class="s3">])].</span><span class="s0">copy</span><span class="s3">()</span>
+
+<span class="s0">X </span><span class="s3">= </span><span class="s0">dfm_model</span><span class="s3">[</span><span class="s0">num_cols </span><span class="s3">+ </span><span class="s0">cat_cols</span><span class="s3">].</span><span class="s0">copy</span><span class="s3">()</span>
+<span class="s0">y </span><span class="s3">= </span><span class="s0">dfm_model</span><span class="s3">[</span><span class="s0">target_col</span><span class="s3">].</span><span class="s0">copy</span><span class="s3">()</span>
+
+<span class="s0">X_train</span><span class="s3">, </span><span class="s0">X_test</span><span class="s3">, </span><span class="s0">y_train</span><span class="s3">, </span><span class="s0">y_test </span><span class="s3">= </span><span class="s0">train_test_split</span><span class="s3">(</span><span class="s0">X</span><span class="s3">, </span><span class="s0">y</span><span class="s3">, </span><span class="s0">stratify</span><span class="s3">=</span><span class="s0">y</span><span class="s3">, </span><span class="s0">random_state</span><span class="s3">=</span><span class="s5">42</span><span class="s3">, </span><span class="s0">test_size</span><span class="s3">=</span><span class="s5">0.2</span><span class="s3">)</span>
+
+<span class="s1"># Impute numerics with median</span>
+<span class="s2">for </span><span class="s0">c </span><span class="s2">in </span><span class="s0">num_cols</span><span class="s3">:</span>
+    <span class="s0">med </span><span class="s3">= </span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">c</span><span class="s3">].</span><span class="s0">median</span><span class="s3">()</span>
+    <span class="s0">X_train</span><span class="s3">[</span><span class="s0">c</span><span class="s3">] = </span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">c</span><span class="s3">].</span><span class="s0">fillna</span><span class="s3">(</span><span class="s0">med</span><span class="s3">)</span>
+    <span class="s0">X_test</span><span class="s3">[</span><span class="s0">c</span><span class="s3">] = </span><span class="s0">X_test</span><span class="s3">[</span><span class="s0">c</span><span class="s3">].</span><span class="s0">fillna</span><span class="s3">(</span><span class="s0">med</span><span class="s3">)</span>
+
+<span class="s0">X_train</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">] = </span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">].</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">)</span>
+<span class="s0">X_test</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">] = </span><span class="s0">X_test</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">].</span><span class="s0">astype</span><span class="s3">(</span><span class="s0">str</span><span class="s3">)</span>
+
+<span class="s1"># Trun orbitalclass into 0 or 1</span>
+<span class="s0">ohe </span><span class="s3">= </span><span class="s0">OneHotEncoder</span><span class="s3">(</span><span class="s0">handle_unknown</span><span class="s3">=</span><span class="s4">'ignore'</span><span class="s3">, </span><span class="s0">sparse_output</span><span class="s3">=</span><span class="s2">False</span><span class="s3">)</span>
+<span class="s0">ohe</span><span class="s3">.</span><span class="s0">fit</span><span class="s3">(</span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">])</span>
+<span class="s0">Z_train_cat </span><span class="s3">= </span><span class="s0">ohe</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">])</span>
+<span class="s0">Z_test_cat </span><span class="s3">= </span><span class="s0">ohe</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">X_test</span><span class="s3">[</span><span class="s0">cat_cols</span><span class="s3">])</span>
+
+<span class="s1"># Scale numerics</span>
+<span class="s0">scaler </span><span class="s3">= </span><span class="s0">StandardScaler</span><span class="s3">().</span><span class="s0">fit</span><span class="s3">(</span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">num_cols</span><span class="s3">])</span>
+<span class="s0">Z_train_num </span><span class="s3">= </span><span class="s0">scaler</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">X_train</span><span class="s3">[</span><span class="s0">num_cols</span><span class="s3">])</span>
+<span class="s0">Z_test_num </span><span class="s3">= </span><span class="s0">scaler</span><span class="s3">.</span><span class="s0">transform</span><span class="s3">(</span><span class="s0">X_test</span><span class="s3">[</span><span class="s0">num_cols</span><span class="s3">])</span>
+
+<span class="s1"># Combine features</span>
+<span class="s0">Z_train </span><span class="s3">= </span><span class="s0">np</span><span class="s3">.</span><span class="s0">hstack</span><span class="s3">([</span><span class="s0">Z_train_num</span><span class="s3">, </span><span class="s0">Z_train_cat</span><span class="s3">])</span>
+<span class="s0">Z_test </span><span class="s3">= </span><span class="s0">np</span><span class="s3">.</span><span class="s0">hstack</span><span class="s3">([</span><span class="s0">Z_test_num</span><span class="s3">, </span><span class="s0">Z_test_cat</span><span class="s3">])</span>
+
+<span class="s0">lr </span><span class="s3">= </span><span class="s0">LogisticRegression</span><span class="s3">(</span><span class="s0">max_iter</span><span class="s3">=</span><span class="s5">600</span><span class="s3">, </span><span class="s0">solver</span><span class="s3">=</span><span class="s4">'lbfgs'</span><span class="s3">,</span>
+                        <span class="s0">class_weight</span><span class="s3">=</span><span class="s2">None</span><span class="s3">)  </span><span class="s1"># Tried class_weight='balance' but gave worse results</span>
+<span class="s0">lr</span><span class="s3">.</span><span class="s0">fit</span><span class="s3">(</span><span class="s0">Z_train</span><span class="s3">, </span><span class="s0">y_train</span><span class="s3">)</span>
+
+<hr class="ls0"><span class="s0">#%% md 
+#### Model Performance <hr class="ls0">#%% 
+pred </span><span class="s3">= </span><span class="s0">lr</span><span class="s3">.</span><span class="s0">predict</span><span class="s3">(</span><span class="s0">Z_test</span><span class="s3">)</span>
+
+<span class="s0">print</span><span class="s3">(</span><span class="s4">f&quot;</span><span class="s2">\n</span><span class="s4">Accuracy: </span><span class="s2">{</span><span class="s0">accuracy_score</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">pred</span><span class="s3">)</span><span class="s2">:</span><span class="s4">.3f</span><span class="s2">}</span><span class="s4">&quot;</span><span class="s3">, )</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">classification_report</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">pred</span><span class="s3">, </span><span class="s0">zero_division</span><span class="s3">=</span><span class="s5">0</span><span class="s3">))</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s1"># confusion matrix</span>
+<span class="s0">labels </span><span class="s3">= </span><span class="s0">sorted</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">.</span><span class="s0">unique</span><span class="s3">())</span>
+<span class="s0">cm </span><span class="s3">= </span><span class="s0">confusion_matrix</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">pred</span><span class="s3">, </span><span class="s0">labels</span><span class="s3">=</span><span class="s0">labels</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">labels</span><span class="s3">)</span>
+<span class="s0">print</span><span class="s3">(</span><span class="s0">cm</span><span class="s3">)</span>
+
+<span class="s0">labels </span><span class="s3">= </span><span class="s0">sorted</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">.</span><span class="s0">unique</span><span class="s3">())</span>
+<span class="s0">ConfusionMatrixDisplay</span><span class="s3">.</span><span class="s0">from_predictions</span><span class="s3">(</span><span class="s0">y_test</span><span class="s3">, </span><span class="s0">pred</span><span class="s3">, </span><span class="s0">labels</span><span class="s3">=</span><span class="s0">labels</span><span class="s3">, </span><span class="s0">xticks_rotation</span><span class="s3">=</span><span class="s5">90</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s1"># Bar chart shows how many satellites are in each Purpose bucket. Histograms show the spread of the numeric features (Perigee, Apogee, etc.).</span><hr class="ls0"><span class="s0">#%% 
+</span><span class="s1"># Class counts bar chart</span>
+<span class="s0">dfm</span><span class="s3">[</span><span class="s4">&quot;PurposeSuperAudit&quot;</span><span class="s3">].</span><span class="s0">value_counts</span><span class="s3">().</span><span class="s0">plot</span><span class="s3">(</span><span class="s0">kind</span><span class="s3">=</span><span class="s4">&quot;bar&quot;</span><span class="s3">, </span><span class="s0">rot</span><span class="s3">=</span><span class="s5">45</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">title</span><span class="s3">(</span><span class="s4">&quot;Purpose (Super Buckets) — Count&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">ylabel</span><span class="s3">(</span><span class="s4">&quot;Count&quot;</span><span class="s3">)</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">tight_layout</span><span class="s3">()</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span>
+
+<span class="s1"># Histograms for key numerics</span>
+<span class="s0">dfm</span><span class="s3">[</span><span class="s0">num_cols</span><span class="s3">].</span><span class="s0">hist</span><span class="s3">(</span><span class="s0">bins</span><span class="s3">=</span><span class="s5">30</span><span class="s3">, </span><span class="s0">figsize</span><span class="s3">=(</span><span class="s5">10</span><span class="s3">, </span><span class="s5">6</span><span class="s3">))</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">tight_layout</span><span class="s3">()</span>
+<span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span>
+
+<span class="s2">if </span><span class="s4">'OrbitClass' </span><span class="s2">in </span><span class="s0">plot_df</span><span class="s3">.</span><span class="s0">columns</span><span class="s3">:</span>
+    <span class="s0">sns</span><span class="s3">.</span><span class="s0">displot</span><span class="s3">(</span>
+        <span class="s0">data</span><span class="s3">=</span><span class="s0">plot_df</span><span class="s3">.</span><span class="s0">dropna</span><span class="s3">(</span><span class="s0">subset</span><span class="s3">=[</span><span class="s4">'Perigee'</span><span class="s3">]),</span>
+        <span class="s0">x</span><span class="s3">=</span><span class="s4">'Perigee'</span><span class="s3">, </span><span class="s0">hue</span><span class="s3">=</span><span class="s0">target_col</span><span class="s3">, </span><span class="s0">col</span><span class="s3">=</span><span class="s4">'OrbitClass'</span><span class="s3">,</span>
+        <span class="s0">kind</span><span class="s3">=</span><span class="s4">'hist'</span><span class="s3">, </span><span class="s0">bins</span><span class="s3">=</span><span class="s5">40</span><span class="s3">, </span><span class="s0">multiple</span><span class="s3">=</span><span class="s4">'layer'</span><span class="s3">, </span><span class="s0">stat</span><span class="s3">=</span><span class="s4">'density'</span><span class="s3">,</span>
+        <span class="s0">common_bins</span><span class="s3">=</span><span class="s2">True</span><span class="s3">, </span><span class="s0">common_norm</span><span class="s3">=</span><span class="s2">False</span><span class="s3">, </span><span class="s0">col_wrap</span><span class="s3">=</span><span class="s5">3</span>
+    <span class="s3">).</span><span class="s0">set</span><span class="s3">(</span><span class="s0">xscale</span><span class="s3">=</span><span class="s4">'log'</span><span class="s3">)  </span><span class="s1"># log helps for Perigee/Apogee</span>
+    <span class="s0">plt</span><span class="s3">.</span><span class="s0">suptitle</span><span class="s3">(</span><span class="s4">'Perigee distribution by OrbitClass and Purpose'</span><span class="s3">, </span><span class="s0">y</span><span class="s3">=</span><span class="s5">1.02</span><span class="s3">)</span>
+    <span class="s0">plt</span><span class="s3">.</span><span class="s0">show</span><span class="s3">()</span><hr class="ls0"><span class="s0">#%% 
+</span><hr class="ls0"><span class="s0">#%% md 
+</span></pre>
+</body>
+</html>
