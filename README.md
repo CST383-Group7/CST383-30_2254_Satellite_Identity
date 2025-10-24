@@ -41,15 +41,16 @@ Can we accurately predict a satellite’s **mission category** using publicly av
 
 ### Data Cleaning & Feature Engineering
 - Dropped redundant *Unnamed* columns; merged fragmented *Source* fields.  
-- Normalized categorical labels (e.g., merged “Gov”, “Govt” → “Government”).  
+- Normalized categorical labels — consolidated **Civil, Government, and Military** user types into consistent categories, which noticeably improved model accuracy.  
+- Incorporated additional **Owner** and **Operator** fields; large clusters such as **SpaceX/Starlink** became highly visible on launch-year timeline plots.  
 - Parsed and extracted `LaunchYear` from `LaunchDate`.  
 - Imputed missing numeric values with medians.  
+- Used `DetailedPurpose` text to refine class assignments — reclassified **military intelligence** and reconnaissance satellites from *Science* to *Surveillance* for more accurate labeling.  
 - Encoded categoricals with one-hot encoding.  
 - Created engineered features:
-  - `LaunchYear` (numerical)
+  - `LaunchYear` (numeric)
   - Period/Inclination “buckets” for visualization
-  - `PurposeSuperAudit`: manually curated high-level categories (Communications, Science, etc.)
-
+  - `PurposeSuperAudit`: manually curated high-level mission categories.
 ---
 
 ## Methods 
@@ -100,7 +101,8 @@ Can we accurately predict a satellite’s **mission category** using publicly av
 
 ### Implications
 - Orbital and physical parameters are powerful proxies for mission classification.  
-- Clear pattern: *Communications* satellites occupy **GEO**, while *Science* and *Tech Demo* prefer **LEO / Sun-synchronous**.  
+- Clear pattern: *Communications* satellites occupy **GEO**, while *Science* and *Tech Demo* favor **LEO / Sun-synchronous**.  
+- Ownership analysis revealed modern trends — e.g., Starlink’s contribution dominates recent *Communications* entries.
 
 ### Limitations
 - Missing payload descriptors (sensor type, transponder details).  
@@ -119,7 +121,8 @@ Can we accurately predict a satellite’s **mission category** using publicly av
 
 - Built a supervised ML model predicting satellite mission from orbital/physical data.  
 - Achieved **94% accuracy** using multinomial Logistic Regression.  
-- Demonstrated that simple linear models already capture strong mission–orbit relationships.  
+- Demonstrated that simple linear models already capture strong mission–orbit relationships.
+- Accuracy improved further through **category normalization** and **purpose reclassification** using domain knowledge.  
 - Future work: rebalance classes, add richer features, and explore non-linear models for higher-granularity prediction.
 
 ---
@@ -129,5 +132,4 @@ Can we accurately predict a satellite’s **mission category** using publicly av
 ```bash
 pip install -r requirements.txt
 jupyter notebook satellite_project.ipynb
-# or:
-python satellite_project.py
+
