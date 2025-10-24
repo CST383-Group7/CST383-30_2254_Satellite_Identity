@@ -2,7 +2,7 @@
 
 **Team:** Jess Hammond, Gary Kuepper, Keshab Neupane  
 **Course:** CST 383 — Data Science  
-**Video (≤5 min):** *link*  
+**Video: [Link](https://youtu.be/KzVvEeuzbCY)** 
 
 ---
 
